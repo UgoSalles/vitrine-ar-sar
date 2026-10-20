@@ -26,3 +26,8 @@ Ensuite : ouvrir le lien sur le téléphone → *Partager → Sur l'écran d'acc
 - **Langues** : FR, JP, EN (ordre de préférence). Une carte = une illustration ; elle peut exister dans plusieurs langues. Ce qu'on coche = une version précise (ex. « 151 Bulbizarre, japonaise »). Dans la collection, la carte s'affiche dans sa langue avec le prix de cette langue. FR et EN partagent la même fiche Cardmarket (même prix) ; le JP a la sienne. Les cartes japonaises sont rapprochées des françaises par (Pokémon, illustrateur, type) + proximité de date (`data/ja-meta.json` = base japonaise embarquée, complétée en ligne).
 - **Tendance** : variation 7 j / 30 j (Cardmarket) sous chaque prix, valeur de la collection et variation sur 7 jours.
 - **Stats** (collection → 📊), **vue par extension**, filtres par type, tri par prix, glisser pour passer d'une carte à l'autre, rappel de sauvegarde, partage de la wish list par lien.
+
+### Règles d'affichage (retours utilisateur)
+- Une carte n'apparaît **qu'une fois** dans « Toutes les cartes », en français (sinon japonais, sinon anglais) ; les autres langues sont des variantes visibles au clic (prix par langue). Seule la collection (et la wish list) affiche la langue choisie.
+- Rapprochement des langues en 2 passes : (1) Pokémon + illustrateur + type AR/SAR + proximité de date, (2) même Pokémon + même illustrateur (faute de frappe tolérée) vers n'importe quelle carte existante (ex. AR japonaise = promo française, AR japonaise de VSTAR Universe = Galerie de Crown Zenith). Ça évite les doublons « même carte, autre langue ».
+- Une carte qui n'existe qu'en japonais n'est affichée que si TCGdex fournit son image. Les images japonaises ne sont jamais « devinées » (les adresses fabriquées tombaient sur d'autres cartes).

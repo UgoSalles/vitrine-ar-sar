@@ -15,7 +15,8 @@ const LNAME = { fr: 'Français', ja: 'Japonais', en: 'Anglais' };
 const LCODE = { fr: 'FR', ja: 'JP', en: 'EN' };
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
 const MIN_DEX = 1025;
-const CATALOG_VERSION = 3;
+const CATALOG_VERSION = 4;
+const DATA_V = 4;                         // à incrémenter quand un fichier de data/ change (évite qu'un navigateur garde l'ancienne version en cache)
 const CATALOG_MAX_AGE = 10 * 60 * 1000;   // pas de re-téléchargement du catalogue en dessous de 10 min
 const PRICE_TTL = 30 * 60 * 1000;         // un prix est considéré frais 30 min
 const DAY = 86400000;
@@ -113,6 +114,7 @@ async function fetchCatalog() {
   });
 
   const cards = [];
+  const illus = new Map();                                // clé d'entrée -> illustrateur normalisé (sert à rapprocher les langues)
   const matchable = new Map();                            // clé (pokémon+illustrateur+type) -> entrées françaises
   for (const c of raw) {
     const m = en.get(c.id);
@@ -120,7 +122,7 @@ async function fetchCatalog() {
     const s = c.id.slice(0, c.id.lastIndexOf('-'));
     const e = { k: c.id, d: m.dexId, n: c.name, r: c.code, v: { fr: { id: c.id, i: c.image, l: c.localId, s } } };
     if (m.image) e.v.en = { id: c.id, i: m.image, l: c.localId, s };
-    cards.push(e);
+    cards.push(e); illus.set(e.k, norm(m.illustrator || ''));
     const key = `${[...m.dexId].sort().join('.')}|${norm(m.illustrator || '')}|${c.code}`;
     if (!matchable.has(key)) matchable.set(key, []);
     matchable.get(key).push(e);
@@ -128,7 +130,7 @@ async function fetchCatalog() {
   const known = new Set(cards.map(c => c.k));
   for (const c of legacy) if (!known.has(c.id)) {
     const v = { id: c.id, l: c.l, s: c.s }; if (c.i) v.i = c.i; if (c.u) v.u = c.u;
-    cards.push({ k: c.id, d: c.d, n: c.n, r: c.r, v: { fr: v } });
+    cards.push({ k: c.id, d: c.d, n: c.n, r: c.r, v: { fr: v } }); illus.set(c.id, norm(c.a || ''));
   }
 
   // Sets (français)
@@ -182,10 +184,26 @@ async function fetchCatalog() {
     // Un rapprochement vers une extension « minoritaire » pour ce set japonais est presque toujours un faux positif.
     const tally = new Map();
     for (const [j, e] of pairs) if (e) { const t = tally.get(j.s) || {}; t[e.v.fr.s] = (t[e.v.fr.s] || 0) + 1; tally.set(j.s, t); }
+    const leftovers = [];
     for (const [j, e] of pairs) {
       const t = tally.get(j.s), total = t ? Object.values(t).reduce((x, y) => x + y, 0) : 0;
-      if (e && t[e.v.fr.s] >= 0.2 * total) e.v.ja = jaVariant(j);
-      else {
+      if (e && t[e.v.fr.s] >= 0.2 * total) e.v.ja = jaVariant(j); else leftovers.push(j);
+    }
+    // 2ᵉ passe : une même illustration peut avoir un autre type côté français (ex. carte AR japonaise = promo française, AR japonaise = Galerie de Crown Zenith).
+    // Même Pokémon + même illustrateur (à une faute de frappe près) = même carte : on rattache la version japonaise à la carte existante plutôt que de créer un doublon.
+    const byDexKey = new Map();
+    for (const e of cards) {
+      if (!illus.get(e.k)) continue;
+      const key = [...e.d].sort().join('.');
+      if (!byDexKey.has(key)) byDexKey.set(key, []);
+      byDexKey.get(key).push(e);
+    }
+    for (const j of leftovers) {
+      const a = norm(j.a), jd = sets['ja:' + j.s]?.d;
+      const cand = a ? (byDexKey.get([...j.d].sort().join('.')) || []).filter(e => e.v.fr && !e.v.ja && similar(illus.get(e.k), a))
+        .map(e => ({ e, gap: days(jd, sets[e.v.fr.s]?.d) })).sort((x, y) => x.gap - y.gap) : [];
+      if (cand.length) cand[0].e.v.ja = jaVariant(j);
+      else if (j.i) {                                       // carte qui n'existe qu'en japonais : affichée seulement si on a son image
         const base = pokedex[j.d[0]];
         cards.push({ k: j.id, d: j.d, n: base ? base + (/ex$/i.test(j.n) ? '-ex' : '') : j.n, r: j.r, v: { ja: jaVariant(j) } });
       }
@@ -194,6 +212,17 @@ async function fetchCatalog() {
   return { v: CATALOG_VERSION, t: Date.now(), cards, sets };
 }
 
+function similar(a, b) {                                // illustrateurs identiques à 2 fautes de frappe près (les bases FR/EN et JP n'écrivent pas toujours pareil)
+  if (a === b) return true;
+  if (!a || !b || Math.min(a.length, b.length) < 6 || Math.abs(a.length - b.length) > 2) return false;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let k = 1; k <= b.length; k++) cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + (a[i - 1] === b[k - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length] <= 2;
+}
 function jaVariant(j) { const v = { id: j.id, l: j.l, s: 'ja:' + j.s }; if (j.i) v.i = j.i; return v; }
 
 // ---------- Index ----------
@@ -824,9 +853,9 @@ document.addEventListener('visibilitychange', () => {
 
 // ---------- Démarrage ----------
 (async function init() {
-  try { pokedex = await getJSON('data/pokedex.json'); } catch { pokedex = {}; }
-  try { legacy = (await Promise.all(['legacy-alt', 'legacy-gallery', 'legacy-promo', 'legacy-scenes'].map(f => getJSON(`data/${f}.json`)))).flat(); } catch { legacy = []; }
-  try { jaBase = await getJSON('data/ja-meta.json'); } catch { /* sans la base japonaise embarquée : détails récupérés un par un */ }
+  try { pokedex = await getJSON(`data/pokedex.json?v=${DATA_V}`); } catch { pokedex = {}; }
+  try { legacy = (await Promise.all(['legacy-alt', 'legacy-gallery', 'legacy-promo', 'legacy-scenes'].map(f => getJSON(`data/${f}.json?v=${DATA_V}`)))).flat(); } catch { legacy = []; }
+  try { jaBase = await getJSON(`data/ja-meta.json?v=${DATA_V}`); } catch { /* sans la base japonaise embarquée : détails récupérés un par un */ }
   if (catalog) { buildIndex(); renderDex(); $('#loading').hidden = true; updateCounts(); paintMenuInfo(); openShared(); }
   paintBackup();
   await refreshCatalog({ announce: true });
