@@ -614,12 +614,16 @@ let sharedKeys = [];
 // ---------- Fenêtres (avec bouton retour du téléphone) ----------
 const stack = [];
 function showModal(sel, replace) { $(sel).hidden = false; stack.push(sel); replace ? history.replaceState({ m: sel }, '') : history.pushState({ m: sel }, ''); }
+let skipPop = 0;                                    // retours d'historique déclenchés par nous (ne doivent pas fermer une 2ᵉ fenêtre)
 function hideTop(fromPop) {
   const sel = stack.pop(); if (!sel) return;
   $(sel).hidden = true;
-  if (!fromPop) history.back();
+  if (!fromPop) { skipPop++; history.back(); }
 }
-window.addEventListener('popstate', () => { if (stack.length) hideTop(true); });
+window.addEventListener('popstate', () => {
+  if (skipPop > 0) { skipPop--; return; }
+  if (stack.length) hideTop(true);                  // bouton retour du téléphone : ferme seulement la fenêtre du dessus
+});
 
 let toastTimer;
 function toast(msg, ms = 4000) {
