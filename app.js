@@ -15,7 +15,7 @@ const LNAME = { fr: 'Français', ja: 'Japonais', en: 'Anglais' };
 const LCODE = { fr: 'FR', ja: 'JP', en: 'EN' };
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
 const MIN_DEX = 1025;
-const CATALOG_VERSION = 2;
+const CATALOG_VERSION = 3;
 const CATALOG_MAX_AGE = 10 * 60 * 1000;   // pas de re-téléchargement du catalogue en dessous de 10 min
 const PRICE_TTL = 30 * 60 * 1000;         // un prix est considéré frais 30 min
 const DAY = 86400000;
@@ -65,7 +65,10 @@ const isOwned = e => ownedLangs(e).length > 0;
 // Image de secours si une image japonaise/anglaise n'existe pas : la même carte dans une autre langue, sinon un dos de carte.
 const fbOf = (e, lang, q = 'low') => { const l = LANGS.find(x => x !== lang && e.v[x] && (e.v[x].i || e.v[x].u)); return l ? imgOf(e.v[l], q) : 'icons/card-back.svg'; };
 window.imgFail = img => { const fb = img.dataset.fb; img.onerror = null; img.src = fb && fb !== img.src ? fb : 'icons/card-back.svg'; };
-const imgAttrs = (e, lang, q = 'low') => `src="${imgOf(e.v[lang], q)}" data-fb="${esc(fbOf(e, lang, q))}" onerror="imgFail(this)"`;
+const hasImg = v => !!(v.i || v.u);
+const noImage = e => !langsOf(e).some(l => hasImg(e.v[l]));
+const noImgTag = e => noImage(e) ? `<span class="noimg">${esc(e.n)}<small>image indisponible</small></span>` : '';
+const imgAttrs = (e, lang, q = 'low') => `src="${hasImg(e.v[lang]) ? imgOf(e.v[lang], q) : fbOf(e, lang, q)}" data-fb="${esc(fbOf(e, lang, q))}" onerror="imgFail(this)"`;
 const imgOf = (v, q = 'low') => v.u ? v.u[q === 'low' ? 0 : 1] : v.i ? `${v.i}/${q}.webp` : 'icons/card-back.svg';
 // Le français et l'anglais partagent la même fiche Cardmarket (donc le même prix) : on ne la charge qu'une fois.
 const pkey = (e, l) => (l === 'en' && e.v.fr) ? vk(e, 'fr') : vk(e, l);
@@ -156,9 +159,8 @@ async function fetchCatalog() {
     for (const [id, c] of jl) {
       const m = meta(id);
       if (!m || m[5] !== 'Pokemon' || !m[0].length) continue;
-      // TCGdex n'a pas l'image de toutes les cartes japonaises : on tente l'adresse habituelle, sinon l'image française prend le relais (voir imgFail)
-      const series = m[3].startsWith('SV') ? 'SV' : m[3].startsWith('M') ? 'M' : 'S';
-      ja.push({ id, d: m[0], a: m[1], r: sar.has(id) ? 'SAR' : 'AR', l: c.localId, s: m[3], n: m[4], i: c.image || `https://assets.tcgdex.net/ja/${series}/${m[3]}/${c.localId}` });
+      // Image japonaise seulement si TCGdex la fournit : les adresses « devinées » tombent sur d'autres cartes. Sinon l'image française prend le relais.
+      ja.push({ id, d: m[0], a: m[1], r: sar.has(id) ? 'SAR' : 'AR', l: c.localId, s: m[3], n: m[4], i: c.image || null });
     }
     await pool([...new Set(ja.map(j => j.s))], 6, async sid => {
       const key = 'ja:' + sid;
@@ -182,15 +184,17 @@ async function fetchCatalog() {
     for (const [j, e] of pairs) if (e) { const t = tally.get(j.s) || {}; t[e.v.fr.s] = (t[e.v.fr.s] || 0) + 1; tally.set(j.s, t); }
     for (const [j, e] of pairs) {
       const t = tally.get(j.s), total = t ? Object.values(t).reduce((x, y) => x + y, 0) : 0;
-      if (e && t[e.v.fr.s] >= 0.2 * total) e.v.ja = { id: j.id, i: j.i, l: j.l, s: 'ja:' + j.s };
+      if (e && t[e.v.fr.s] >= 0.2 * total) e.v.ja = jaVariant(j);
       else {
         const base = pokedex[j.d[0]];
-        cards.push({ k: j.id, d: j.d, n: base ? base + (/ex$/i.test(j.n) ? '-ex' : '') : j.n, r: j.r, v: { ja: { id: j.id, i: j.i, l: j.l, s: 'ja:' + j.s } } });
+        cards.push({ k: j.id, d: j.d, n: base ? base + (/ex$/i.test(j.n) ? '-ex' : '') : j.n, r: j.r, v: { ja: jaVariant(j) } });
       }
     }
   }
   return { v: CATALOG_VERSION, t: Date.now(), cards, sets };
 }
+
+function jaVariant(j) { const v = { id: j.id, l: j.l, s: 'ja:' + j.s }; if (j.i) v.i = j.i; return v; }
 
 // ---------- Index ----------
 function toEntry(c) {                                  // anciennes cartes ajoutées à la main (format v1) -> entrée
@@ -218,6 +222,7 @@ function buildIndex() {
 
 // ---------- Prix ----------
 const inflight = new Map();
+const failed = new Set();                      // prix qu'on n'a pas pu charger (réseau, limite de débit) : réessayés à la prochaine occasion
 let saveTimer;
 function savePrices() { clearTimeout(saveTimer); saveTimer = setTimeout(() => store.set('prices', prices), 800); }
 
@@ -227,12 +232,14 @@ function ensurePrice(pk, force = false) {
   if (inflight.has(pk)) return inflight.get(pk);
   const [lang, ...rest] = pk.split(':'), id = rest.join(':');
   const job = limit(async () => {
-    try {
-      const d = await getJSON(`${API}/${lang}/cards/${id}`);
-      const cm = d.pricing?.cardmarket;
-      prices[pk] = { t: Date.now(), tr: cm?.trend || cm?.avg || null, avg: cm?.avg ?? null, low: cm?.low ?? null, a1: cm?.avg1 ?? null, a7: cm?.avg7 ?? null, a30: cm?.avg30 ?? null, up: cm?.updated || null };
-      savePrices();
-    } catch { /* garde l'ancien prix s'il existe */ }
+    for (let attempt = 0; attempt < 3; attempt++) {         // TCGdex limite parfois le débit : on réessaie quelques secondes plus tard
+      try {
+        const d = await getJSON(`${API}/${lang}/cards/${id}`);
+        const cm = d.pricing?.cardmarket;
+        prices[pk] = { t: Date.now(), tr: cm?.trend || cm?.avg || null, avg: cm?.avg ?? null, low: cm?.low ?? null, a1: cm?.avg1 ?? null, a7: cm?.avg7 ?? null, a30: cm?.avg30 ?? null, up: cm?.updated || null };
+        failed.delete(pk); savePrices(); break;
+      } catch { if (attempt === 2) failed.add(pk); else await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); }
+    }
     inflight.delete(pk);
     paintPrice(pk);
     return prices[pk];
@@ -256,11 +263,11 @@ function dltHTML(pk) {
 }
 function priceHTML(pk) {
   const p = prices[pk], v = p?.tr != null ? eur(p.tr) : null;
-  return `<span class="price${v ? '' : ' na'}" data-pk="${pk}">${v || (p ? '—' : '…')}</span>${dltHTML(pk)}`;
+  return `<span class="price${v ? '' : ' na'}" data-pk="${pk}">${v || (p ? '—' : failed.has(pk) ? '⟳' : '…')}</span>${dltHTML(pk)}`;
 }
 function paintPrice(pk) {
   const p = prices[pk], v = p?.tr != null ? eur(p.tr) : null;
-  document.querySelectorAll(`[data-pk="${pk}"]`).forEach(el => { el.textContent = v || '—'; el.classList.toggle('na', !v); });
+  document.querySelectorAll(`[data-pk="${pk}"]`).forEach(el => { el.textContent = v || (p ? '—' : '⟳'); el.classList.toggle('na', !v); });
   const c = pct(p?.tr, p?.a7);
   document.querySelectorAll(`[data-dk="${pk}"]`).forEach(el => {
     if (c == null || Math.abs(c) < 1) { el.textContent = ''; el.className = 'dlt'; }
@@ -335,7 +342,7 @@ function pcardHTML(e) {
   const ow = ownedLangs(e), wi = wishLangs(e).length > 0, pv = prefV(e), pk = prefPk(e);
   return `<div class="pcard ${ow.length ? 'on' : 'off'}${wi ? ' wished' : ''}" data-k="${esc(e.k)}">
     <div class="img" data-open="${esc(e.k)}"><img ${imgAttrs(e, prefLang(e))} alt="${esc(e.n)}" loading="lazy">
-      <span class="badge ${e.r}">${rar(e.r)}</span>${langChips(e)}</div>
+      <span class="badge ${e.r}">${rar(e.r)}</span>${langChips(e)}${noImgTag(e)}</div>
     <div class="meta"><span class="set">${esc(setName(pv.s))} · n° ${esc(pv.l)}</span><span class="pl">${priceHTML(pk)}</span></div>
     <div class="acts"><button class="check" data-own-entry="${esc(e.k)}"><span class="box">✓</span><span>${ow.length ? `Dans ma collection · ${ow.map(l => LCODE[l]).join('/')}` : 'Ajouter à ma collection'}</span></button>
     <button class="wbtn" data-wish-entry="${esc(e.k)}" aria-label="Wish list" title="Wish list">♥</button></div>${e.r === 'PERSO' ? `<button class="mini" data-uncustom="${esc(e.k)}">Retirer de la liste</button>` : ''}</div>`;
@@ -384,7 +391,7 @@ function renderList(kind) {
   const rows = [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([dex, list]) => [dex, list.sort(order)]);
   $(kind === 'wish' ? '#wishList' : '#colList').innerHTML = rows.length ? rows.map(([dex, list]) => `
     <div class="col-group"><h3>#${pad(dex)} ${esc(dexName(dex))} <span>${plural(list.length, 'carte')}</span></h3>
-      <div class="col-cards">${list.map(({ e, lang }) => `<button class="ccard" data-view="${esc(vkey(lang, e.v[lang].id))}"><div class="img"><img ${imgAttrs(e, lang)} alt="${esc(e.n)}" loading="lazy"><i class="lg badge-lg">${LCODE[lang]}</i></div>${kind === 'wish' ? langPrices(e, lang) : `<span class="pl">${priceHTML(pkey(e, lang))}</span>`}</button>`).join('')}</div>
+      <div class="col-cards">${list.map(({ e, lang }) => `<button class="ccard" data-view="${esc(vkey(lang, e.v[lang].id))}"><div class="img"><img ${imgAttrs(e, lang)} alt="${esc(e.n)}" loading="lazy"><i class="lg badge-lg">${LCODE[lang]}</i>${noImgTag(e)}</div>${kind === 'wish' ? langPrices(e, lang) : `<span class="pl">${priceHTML(pkey(e, lang))}</span>`}</button>`).join('')}</div>
     </div>`).join('')
     : kind === 'wish'
       ? `<div class="empty">Ta wish list est vide.<br>Dans « Toutes les cartes », ouvre un Pokémon et touche ♥ sous la carte que tu cherches.</div>`
@@ -396,7 +403,7 @@ function renderList(kind) {
 }
 const collectionOrder = { col: [], wish: [] };
 // Wish list : le prix de chaque langue disponible, la langue recherchée en surbrillance
-const langPrices = (e, lang) => `<span class="lpx">${langsOf(e).map(l => { const p = prices[pkey(e, l)]?.tr; return `<span class="${l === lang ? 'cur' : ''}"><i class="lg">${LCODE[l]}</i><span class="price${p != null ? '' : ' na'}" data-pk="${pkey(e, l)}">${p != null ? eur(p) : '…'}</span></span>`; }).join('')}</span>`;
+const langPrices = (e, lang) => `<span class="lpx">${langsOf(e).map(l => { const p = prices[pkey(e, l)]?.tr; return `<span class="${l === lang ? 'cur' : ''}"><i class="lg">${LCODE[l]}</i><span class="price${p != null ? '' : ' na'}" data-pk="${pkey(e, l)}">${p != null ? eur(p) : failed.has(pkey(e, l)) ? '⟳' : '…'}</span></span>`; }).join('')}</span>`;
 const renderCollection = () => renderList('col');
 const renderWish = () => renderList('wish');
 
@@ -437,8 +444,8 @@ function paintViewer(full) {
   const e = byKey.get(viewer.k); if (!e) return;
   const v = e.v[viewer.lang];
   if (full) {
-    const im = $('#vImg'); im.dataset.fb = fbOf(e, viewer.lang, 'high'); im.onerror = () => window.imgFail(im); im.src = imgOf(v, 'high');
-    $('#vInfo').innerHTML = `<h2>${esc(e.n)} <span class="badge-inline ${e.r}">${rar(e.r)}</span></h2><div class="muted">${esc(setName(v.s))} · n° ${esc(v.l)}</div>`;
+    const im = $('#vImg'); im.dataset.fb = fbOf(e, viewer.lang, 'high'); im.onerror = () => window.imgFail(im); im.src = hasImg(v) ? imgOf(v, 'high') : fbOf(e, viewer.lang, 'high');
+    $('#vInfo').innerHTML = `<h2>${esc(e.n)} <span class="badge-inline ${e.r}">${rar(e.r)}</span></h2><div class="muted">${esc(setName(v.s))} · n° ${esc(v.l)}</div>${hasImg(v) ? '' : `<div class="muted tiny">Image ${LNAME[viewer.lang].toLowerCase()} indisponible : illustration d’une autre langue affichée.</div>`}`;
     $('#vPrev').hidden = viewer.idx <= 0; $('#vNext').hidden = viewer.idx >= viewer.list.length - 1;
     $('#vPos').textContent = viewer.list.length > 1 ? `${viewer.idx + 1} / ${viewer.list.length}` : '';
   }
@@ -730,6 +737,7 @@ function removeCustom(k) {
 // ---------- Événements ----------
 document.addEventListener('click', e => {
   const t = e.target;
+  const rp = t.closest('[data-pk]'); if (rp && rp.textContent === '⟳') { rp.textContent = '…'; ensurePrice(rp.dataset.pk, true); return; }
   if (t.closest('[data-close]')) return hideTop();
   const pk = t.closest('[data-pick]'); if (pk) return addCustom(pk.dataset.pick, pk);
   const uc = t.closest('[data-uncustom]'); if (uc) return removeCustom(uc.dataset.uncustom);

@@ -1,5 +1,5 @@
 // Service worker : l'appli s'ouvre même hors ligne ; images mises en cache ; données/prix toujours via le réseau.
-const SHELL = 'vitrine-shell-v7';
+const SHELL = 'vitrine-shell-v9';
 const IMGS = 'vitrine-img-v1';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'data/pokedex.json', 'data/legacy-alt.json', 'data/legacy-gallery.json', 'data/legacy-promo.json', 'data/legacy-scenes.json', 'data/ja-meta.json', 'icons/card-back.svg', 'icons/icon.svg'];
 
