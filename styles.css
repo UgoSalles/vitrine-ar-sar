@@ -14,7 +14,8 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.35 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { overflow-x: hidden; margin: 0; background: var(--bg); color: var(--text); font: 16px/1.35 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
 body { min-height: 100dvh; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 [hidden] { display: none !important; }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
@@ -39,10 +40,10 @@ main { padding: 6px 12px 16px; }
 .loading { text-align: center; color: var(--muted); padding: 40px 0; }
 
 /* Pokédex */
-.dex-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-@media (min-width: 520px) { .dex-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 760px) { .dex-grid { grid-template-columns: repeat(6, 1fr); } }
-.tile { position: relative; background: var(--card); border-radius: 16px; padding: 8px 6px 10px; text-align: center;
+.dex-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 520px) { .dex-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 760px) { .dex-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.tile { min-width: 0; position: relative; background: var(--card); border-radius: 16px; padding: 8px 6px 10px; text-align: center;
   content-visibility: auto; contain-intrinsic-size: 150px 170px; border: 1px solid transparent; }
 .tile:active { transform: scale(.97); }
 .tile img { width: 100%; aspect-ratio: 1; object-fit: contain; display: block; }
@@ -66,7 +67,7 @@ main { padding: 6px 12px 16px; }
 .sheet-head img { width: 76px; height: 76px; object-fit: contain; }
 .sheet-title { flex: 1; min-width: 0; }
 .sheet-title h2 { font-size: 1.3rem; }
-.sheet-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 12px; }
+.sheet-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
 .pcard { display: flex; flex-direction: column; gap: 6px; }
 .pcard .img { position: relative; border-radius: 10px; overflow: hidden; background: var(--card); aspect-ratio: 245 / 342; }
 .pcard .img img { width: 100%; height: 100%; display: block; object-fit: cover; }
@@ -87,8 +88,8 @@ main { padding: 6px 12px 16px; }
 .col-group { margin-bottom: 18px; }
 .col-group h3 { margin: 6px 4px 8px; font-size: .95rem; display: flex; gap: 8px; align-items: baseline; }
 .col-group h3 span { color: var(--muted); font-weight: 400; font-size: .8rem; }
-.col-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; }
-@media (min-width: 640px) { .col-cards { grid-template-columns: repeat(5, 1fr); } }
+.col-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
+@media (min-width: 640px) { .col-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .ccard { text-align: center; }
 .ccard .img { border-radius: 8px; overflow: hidden; aspect-ratio: 245 / 342; background: var(--card); }
 .ccard img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -133,3 +134,8 @@ main { padding: 6px 12px 16px; }
 .pk-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; font-size: .9rem; }
 .pk-item .btn { flex: none; padding: 8px 14px; }
 .badge.SCN { background: #ffd43b; } .badge-inline.SCN { background: #ffd43b; }
+button, .tile, .tab { touch-action: manipulation; }
+body { -webkit-user-select: none; user-select: none; }
+input { -webkit-user-select: text; user-select: text; }
+.tab { position: relative; }
+.tab b { position: absolute; top: 5px; left: calc(50% + 6px); margin: 0; }
