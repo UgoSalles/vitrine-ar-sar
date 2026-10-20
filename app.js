@@ -31,6 +31,7 @@ let extraSets = {};
 let legacy = [];                        // alt arts + galeries d'avant Écarlate et Violet (listes fixes : data/legacy-*.json)
 let catalog = store.get('catalog', null); // { t, cards: [...], sets: {...} }
 let owned = new Set(store.get('owned', []));
+let wish = new Set(store.get('wish', []));   // wish list : une carte est soit dans la collection, soit dans la wish list
 let prices = store.get('prices', {});   // { id: { t, tr, avg, low, up } }
 let byDex = new Map();                  // dex -> cartes triées
 let byId = new Map();
@@ -153,7 +154,7 @@ function paintPrice(id) {
   const p = prices[id];
   const v = p?.tr != null ? eur(p.tr) : null;
   document.querySelectorAll(`[data-pid="${id}"]`).forEach(el => { el.textContent = v || '—'; el.classList.toggle('na', !v); });
-  if (tab === 'col') paintTotal();
+  if (tab === 'col' || tab === 'wish') paintTotal();
   if (!$('#viewer').hidden && viewerId === id) paintViewerPrice();
 }
 function watchPrices(ids, force = false) { ids.forEach(id => ensurePrice(id, force)); }
@@ -161,12 +162,14 @@ function watchPrices(ids, force = false) { ids.forEach(id => ensurePrice(id, for
 // ---------- Rendu : Pokédex ----------
 function ownedCount(dex) { return (byDex.get(dex) || []).filter(c => owned.has(c.id)).length; }
 
+function wishCount(dex) { return (byDex.get(dex) || []).filter(c => wish.has(c.id)).length; }
+
 function tileHTML(n) {
   const list = byDex.get(n) || [];
-  const o = ownedCount(n);
+  const o = ownedCount(n), w = wishCount(n);
   const cls = ['tile', list.length ? 'has' : 'zero', list.length && o === list.length ? 'done' : ''].join(' ');
   return `<button class="${cls}" data-dex="${n}">
-    <span class="num">${pad(n)}</span>${o ? `<span class="own">${o}/${list.length}</span>` : ''}
+    <span class="num">${pad(n)}</span>${o ? `<span class="own">${o}/${list.length}</span>` : ''}${w ? `<span class="wsh">♥ ${w}</span>` : ''}
     <img src="${ARTWORK(n)}" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">
     <div class="nm">${esc(dexName(n))}</div>
     <div class="cnt">${list.length} carte${list.length > 1 ? 's' : ''}</div></button>`;
@@ -192,12 +195,13 @@ function refreshTile(n) {
 // ---------- Rendu : feuille d'un Pokémon ----------
 let sheetDex = null;
 function pcardHTML(c) {
-  const on = owned.has(c.id);
-  return `<div class="pcard ${on ? 'on' : 'off'}" data-id="${c.id}">
+  const on = owned.has(c.id), wi = wish.has(c.id);
+  return `<div class="pcard ${on ? 'on' : 'off'}${wi ? ' wished' : ''}" data-id="${c.id}">
     <div class="img"><img src="${cardImg(c)}" alt="${esc(c.n)}" loading="lazy">
       <span class="badge ${c.r}">${rar(c.r)}</span><button class="zoom" data-zoom="${c.id}" aria-label="Agrandir">⤢</button></div>
     <div class="meta"><span class="set">${esc(setName(c.s))} · n° ${esc(c.l)}</span>${priceHTML(c.id)}</div>
-    <button class="check" data-toggle="${c.id}"><span class="box">✓</span><span>${on ? 'Dans ma collection' : 'Ajouter à ma collection'}</span></button>${c.r === 'PERSO' ? `<button class="mini" data-uncustom="${c.id}">Retirer de la liste</button>` : ''}</div>`;
+    <div class="acts"><button class="check" data-toggle="${c.id}"><span class="box">✓</span><span>${on ? 'Dans ma collection' : 'Ajouter à ma collection'}</span></button>
+    <button class="wbtn" data-wish="${c.id}" aria-label="Wish list" title="Wish list">♥</button></div>${c.r === 'PERSO' ? `<button class="mini" data-uncustom="${c.id}">Retirer de la liste</button>` : ''}</div>`;
 }
 function openSheet(n) {
   sheetDex = n;
@@ -220,28 +224,34 @@ function paintSheetInfo() {
   $('#shInfo').title = sets.join(', ');
 }
 
-// ---------- Rendu : collection ----------
-function renderCollection() {
+// ---------- Rendu : collection et wish list ----------
+const listSet = () => tab === 'wish' ? wish : owned;
+function renderCollection() { renderList('col'); }
+function renderWish() { renderList('wish'); }
+function renderList(kind) {
+  const src = kind === 'wish' ? wish : owned;
   const groups = [];
   for (const [dex, list] of [...byDex.entries()].sort((a, b) => a[0] - b[0])) {
-    const mine = list.filter(c => owned.has(c.id) && c.d[0] === dex);   // carte multi-Pokémon : rangée sous le plus petit n°
+    const mine = list.filter(c => src.has(c.id) && c.d[0] === dex);   // carte multi-Pokémon : rangée sous le plus petit n°
     if (mine.length) groups.push([dex, mine]);
   }
-  $('#colList').innerHTML = groups.length ? groups.map(([dex, mine]) => `
+  $(kind === 'wish' ? '#wishList' : '#colList').innerHTML = groups.length ? groups.map(([dex, mine]) => `
     <div class="col-group"><h3>#${pad(dex)} ${esc(dexName(dex))} <span>${mine.length} carte${mine.length > 1 ? 's' : ''}</span></h3>
       <div class="col-cards">${mine.map(c => `<button class="ccard" data-view="${c.id}"><div class="img"><img src="${cardImg(c)}" alt="${esc(c.n)}" loading="lazy"></div>${priceHTML(c.id)}</button>`).join('')}</div>
     </div>`).join('')
-    : `<div class="empty">Ta collection est vide.<br>Va dans « Toutes les cartes », choisis un Pokémon et coche tes cartes.</div>`;
+    : kind === 'wish'
+      ? `<div class="empty">Ta wish list est vide.<br>Dans « Toutes les cartes », ouvre un Pokémon et touche ♥ sous la carte que tu cherches.</div>`
+      : `<div class="empty">Ta collection est vide.<br>Va dans « Toutes les cartes », choisis un Pokémon et coche tes cartes.</div>`;
   watchPrices(groups.flatMap(([, m]) => m.map(c => c.id)));
   paintTotal();
 }
 function paintTotal() {
-  const mine = [...owned].filter(id => byId.has(id));
+  const mine = [...listSet()].filter(id => byId.has(id));
   let sum = 0, known = 0;
   for (const id of mine) { const v = prices[id]?.tr; if (v != null) { sum += v; known++; } }
   const pending = mine.length - known;
   $('#colSummary').innerHTML = `<span><b>${mine.length}</b> carte${mine.length > 1 ? 's' : ''}</span>
-    <span class="total">Valeur : <b>${eur(sum)}</b>${pending ? ` <small>(${pending} prix en attente)</small>` : ''}</span>`;
+    <span class="total">${tab === 'wish' ? 'À prévoir' : 'Valeur'} : <b>${eur(sum)}</b>${pending ? ` <small>(${pending} prix en attente)</small>` : ''}</span>`;
 }
 
 // ---------- Visionneuse ----------
@@ -266,34 +276,57 @@ function paintViewerPrice() {
     : '<div class="muted">Pas de prix disponible</div>';
 }
 function paintViewerBtn() {
-  const b = $('#vToggle'), on = owned.has(viewerId);
+  const b = $('#vToggle'), on = owned.has(viewerId), w = $('#vWish'), wi = wish.has(viewerId);
   b.textContent = on ? 'Retirer de ma collection' : 'Ajouter à ma collection';
   b.classList.toggle('danger', on);
+  w.textContent = wi ? '♥ Dans ma wish list (retirer)' : '♡ Ajouter à la wish list';
+  w.classList.toggle('on', wi);
 }
 
 // ---------- Actions ----------
-function toggle(id) {
-  if (owned.has(id)) owned.delete(id); else owned.add(id);
-  store.set('owned', [...owned]);
-  const c = byId.get(id);
+function saveLists() { store.set('owned', [...owned]); store.set('wish', [...wish]); }
+function updateCounts() {
   $('#colCount').textContent = [...owned].filter(i => byId.has(i)).length;
+  $('#wishCount').textContent = [...wish].filter(i => byId.has(i)).length;
+}
+function afterChange(id) {
+  saveLists(); updateCounts();
+  const c = byId.get(id);
   document.querySelectorAll(`.pcard[data-id="${id}"]`).forEach(el => {
     const on = owned.has(id);
-    el.classList.toggle('on', on); el.classList.toggle('off', !on);
+    el.classList.toggle('on', on); el.classList.toggle('off', !on); el.classList.toggle('wished', wish.has(id));
     el.querySelector('.check span:last-child').textContent = on ? 'Dans ma collection' : 'Ajouter à ma collection';
   });
   if (c) c.d.forEach(refreshTile);
   if (sheetDex != null && !$('#sheet').hidden) paintSheetInfo();
+  if (!$('#viewer').hidden && viewerId === id) paintViewerBtn();
   if (tab === 'col') renderCollection();
+  if (tab === 'wish') renderWish();
+}
+function toggle(id) {                       // collection (une carte qui entre en collection sort de la wish list)
+  if (owned.has(id)) owned.delete(id); else { owned.add(id); if (wish.delete(id)) toast('Carte passée de la wish list à ta collection ✔'); }
+  afterChange(id);
+}
+function toggleWish(id) {
+  if (wish.has(id)) wish.delete(id);
+  else {
+    if (owned.has(id)) {
+      if (!confirm('Cette carte est dans ta collection. La déplacer dans la wish list ?')) return;
+      owned.delete(id);
+    }
+    wish.add(id);
+  }
+  afterChange(id);
 }
 
 function setTab(t) {
   tab = t;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  $('#viewDex').hidden = t !== 'dex'; $('#viewCol').hidden = t !== 'col';
-  $('#dexTools').hidden = t !== 'dex'; $('#colSummary').hidden = t !== 'col';
-  $('#title').textContent = t === 'dex' ? 'Tous les Pokémon' : 'Ma collection';
+  $('#viewDex').hidden = t !== 'dex'; $('#viewCol').hidden = t !== 'col'; $('#viewWish').hidden = t !== 'wish';
+  $('#dexTools').hidden = t !== 'dex'; $('#colSummary').hidden = t === 'dex';
+  $('#title').textContent = { dex: 'Tous les Pokémon', col: 'Ma collection', wish: 'Ma wish list' }[t];
   if (t === 'col') renderCollection();
+  if (t === 'wish') renderWish();
   window.scrollTo(0, 0);
 }
 
@@ -318,7 +351,7 @@ function toast(msg, ms = 4000) {
 
 // ---------- Export / import ----------
 async function exportCollection() {
-  const data = JSON.stringify({ app: 'vitrine-ar-sar', date: new Date().toISOString(), owned: [...owned] }, null, 1);
+  const data = JSON.stringify({ app: 'vitrine-ar-sar', date: new Date().toISOString(), owned: [...owned], wish: [...wish] }, null, 1);
   const file = new File([data], 'ma-collection-pokemon.json', { type: 'application/json' });
   try {
     if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'Ma collection' }); return; }
@@ -330,12 +363,12 @@ async function importCollection(file) {
   try {
     const d = JSON.parse(await file.text());
     if (!Array.isArray(d.owned)) throw new Error();
-    const before = owned.size;
-    d.owned.forEach(id => typeof id === 'string' && owned.add(id));
-    store.set('owned', [...owned]);
-    $('#colCount').textContent = [...owned].filter(i => byId.has(i)).length;
-    renderDex(); if (tab === 'col') renderCollection();
-    toast(`${owned.size - before} carte(s) ajoutée(s)`);
+    const before = owned.size + wish.size;
+    d.owned.forEach(id => typeof id === 'string' && (owned.add(id), wish.delete(id)));
+    (Array.isArray(d.wish) ? d.wish : []).forEach(id => typeof id === 'string' && !owned.has(id) && wish.add(id));
+    saveLists(); updateCounts();
+    renderDex(); if (tab === 'col') renderCollection(); if (tab === 'wish') renderWish();
+    toast(`${owned.size + wish.size - before} carte(s) ajoutée(s)`);
   } catch { toast('Fichier non valide'); }
 }
 
@@ -345,8 +378,9 @@ function applyCatalog(newCat, announce) {
   const fresh = newCat.cards.filter(c => !oldIds.has(c.id));
   catalog = newCat; store.set('catalog', catalog);
   buildIndex(); renderDex();
-  $('#colCount').textContent = [...owned].filter(i => byId.has(i)).length;
+  updateCounts();
   if (tab === 'col') renderCollection();
+  if (tab === 'wish') renderWish();
   if (sheetDex != null && !$('#sheet').hidden) openSheetKeep();
   $('#menuInfo').textContent = `${catalog.cards.length} cartes AR/SAR · catalogue du ${new Date(catalog.t).toLocaleString('fr-FR')}`;
   if (announce && fresh.length) {
@@ -375,7 +409,7 @@ async function refreshCatalog({ force = false, announce = true } = {}) {
 
 function currentPriceIds() {
   const ids = new Set();
-  if (tab === 'col') owned.forEach(id => byId.has(id) && ids.add(id));
+  if (tab === 'col' || tab === 'wish') listSet().forEach(id => byId.has(id) && ids.add(id));
   if (!$('#sheet').hidden) (byDex.get(sheetDex) || []).forEach(c => ids.add(c.id));
   return [...ids];
 }
@@ -430,11 +464,12 @@ async function addCustom(id, btn) {
 }
 function removeCustom(id) {
   custom = custom.filter(c => c.id !== id); store.set('custom', custom);
-  owned.delete(id); store.set('owned', [...owned]);
+  owned.delete(id); wish.delete(id); saveLists();
   buildIndex(); renderDex();
-  $('#colCount').textContent = [...owned].filter(i => byId.has(i)).length;
+  updateCounts();
   if (sheetDex != null) { openSheetKeep(); if (!(byDex.get(sheetDex) || []).length) $('#shCards').innerHTML = ''; }
   if (tab === 'col') renderCollection();
+  if (tab === 'wish') renderWish();
 }
 
 // ---------- Événements ----------
@@ -447,6 +482,7 @@ document.addEventListener('click', e => {
   const tile = t.closest('[data-dex]'); if (tile) return openSheet(+tile.dataset.dex);
   const z = t.closest('[data-zoom]'); if (z) return openViewer(z.dataset.zoom);
   const tg = t.closest('[data-toggle]'); if (tg) return toggle(tg.dataset.toggle);
+  const wb = t.closest('[data-wish]'); if (wb) return toggleWish(wb.dataset.wish);
   const v = t.closest('[data-view]'); if (v) return openViewer(v.dataset.view);
   const tb = t.closest('.tab'); if (tb) return setTab(tb.dataset.tab);
   const ch = t.closest('.chip'); if (ch) {
@@ -462,7 +498,8 @@ document.addEventListener('click', e => {
   }
   if (t.closest('#exportBtn')) return exportCollection();
   if (t.closest('#importBtn')) return $('#importFile').click();
-  if (t.closest('#vToggle')) { toggle(viewerId); paintViewerBtn(); }
+  if (t.closest('#vToggle')) return toggle(viewerId);
+  if (t.closest('#vWish')) return toggleWish(viewerId);
 });
 $('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importCollection(f); e.target.value = ''; });
 $('#pkSearch').addEventListener('input', renderPicker);
@@ -478,7 +515,7 @@ document.addEventListener('visibilitychange', () => {
 (async function init() {
   try { pokedex = await getJSON('data/pokedex.json'); } catch { pokedex = {}; }
   try { legacy = (await Promise.all(['legacy-alt', 'legacy-gallery', 'legacy-promo', 'legacy-scenes'].map(f => getJSON(`data/${f}.json`)))).flat(); } catch { legacy = []; }
-  if (catalog) { buildIndex(); renderDex(); $('#loading').hidden = true; $('#colCount').textContent = [...owned].filter(i => byId.has(i)).length; }
+  if (catalog) { buildIndex(); renderDex(); $('#loading').hidden = true; updateCounts(); }
   await refreshCatalog({ announce: true });
   if (catalog) $('#menuInfo').textContent = `${catalog.cards.length} cartes AR/SAR · catalogue du ${new Date(catalog.t).toLocaleString('fr-FR')}`;
 })();

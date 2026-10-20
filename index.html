@@ -38,12 +38,16 @@
     <section id="viewCol" class="view" hidden>
       <div id="colList"></div>
     </section>
+    <section id="viewWish" class="view" hidden>
+      <div id="wishList"></div>
+    </section>
     <div id="loading" class="loading">Chargement du catalogue…</div>
   </main>
 
   <nav class="tabbar">
     <button class="tab on" data-tab="dex"><span class="ti">📖</span>Toutes les cartes</button>
-    <button class="tab" data-tab="col"><span class="ti">⭐</span>Ma collection <b id="colCount">0</b></button>
+    <button class="tab" data-tab="col"><span class="ti">⭐</span>Collection <b id="colCount">0</b></button>
+    <button class="tab" data-tab="wish"><span class="ti">♥</span>Wish list <b id="wishCount">0</b></button>
   </nav>
 
   <!-- Feuille d'un Pokémon -->
@@ -83,8 +87,9 @@
     <div class="viewer-body">
       <img id="vImg" alt="">
       <div id="vInfo" class="viewer-info"></div>
-      <div class="viewer-actions">
+      <div class="viewer-actions col">
         <button class="btn" id="vToggle"></button>
+        <button class="btn wish" id="vWish"></button>
         <button class="btn ghost" data-close>Fermer</button>
       </div>
     </div>

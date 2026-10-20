@@ -8,6 +8,7 @@ Appli web (PWA) pour suivre sa collection de cartes Pokémon **Illustration rare
 - **Promos illustrées** (badge PRM, `data/legacy-promo.json`) : promos Écarlate & Violet / Méga-Évolution en pleine illustration (Pokémon Center, 30ᵉ anniversaire…), triées à l'œil.
 - **Mises en scène** (badge SCÈNE, `data/legacy-scenes.json`) : cartes pleine illustration où le Pokémon n'est pas seul — duos GX / Tag Team (Soleil & Lune), Pikachu/Amphinobi/Mewtwo/Zacian/Morpeko V-UNION, et les ex avec leur dresseur en arrière-plan (Zoroark-ex de N, Mewtwo-ex de la Team Rocket…).
 - **Carte manquante ?** Dans la fiche d'un Pokémon, bouton « ＋ Il manque une carte ? » : liste toutes les cartes de ce Pokémon dans la base ; celle qu'on choisit est ajoutée à sa liste (badge PERSO, stockée sur l'appareil).
+- **Wish list** (3ᵉ onglet) : bouton ♥ sous chaque carte. Une carte est soit dans la collection, soit dans la wish list (en cocher une la fait passer de l'une à l'autre). Total « à prévoir » en haut.
 - **Nouvelles extensions** : le catalogue est relu à chaque ouverture depuis TCGdex ; les nouvelles cartes apparaissent toutes seules au bon Pokémon.
 - **Prix** : cote Cardmarket (tendance, €), rechargée à chaque ouverture (Cardmarket met à jour ~1×/jour).
 - Chaque personne a sa collection **sur son propre téléphone** (bouton ⋯ → exporter / importer pour la sauvegarder).

@@ -139,3 +139,16 @@ body { -webkit-user-select: none; user-select: none; }
 input { -webkit-user-select: text; user-select: text; }
 .tab { position: relative; }
 .tab b { position: absolute; top: 5px; left: calc(50% + 6px); margin: 0; }
+
+/* Wish list */
+.tile .wsh { position: absolute; top: 6px; right: 6px; background: #ff6b8b; color: #2b0610; font-size: .68rem; font-weight: 700; padding: 1px 6px; border-radius: 99px; }
+.tile .own + .wsh { top: 26px; }
+.acts { display: flex; gap: 6px; }
+.acts .check { flex: 1; min-width: 0; }
+.wbtn { flex: none; width: 40px; border-radius: 10px; background: var(--card); color: var(--muted); font-size: 1.15rem; }
+.pcard.wished .wbtn { background: rgba(255, 107, 139, .2); color: #ff6b8b; }
+.pcard.wished .img img { opacity: .8; }
+.viewer-actions.col { flex-direction: column; }
+.btn.wish { background: var(--card); }
+.btn.wish.on { background: rgba(255, 107, 139, .2); color: #ff6b8b; }
+.tab { font-size: .72rem; }
