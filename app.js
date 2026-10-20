@@ -297,7 +297,6 @@ function renderDex() {
   for (let n = 1; n <= maxDex; n++) {
     const list = dexList(n);
     if (filter === 'cards' && !list.length) continue;
-    if (filter === 'missing' && (!list.length || ownedCount(list) === list.length)) continue;
     if (q && !(norm(dexName(n)).includes(q) || String(n) === q.replace(/^#?0*/, '') || pad(n).includes(q))) continue;
     out.push(tileHTML(n));
   }
