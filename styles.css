@@ -214,3 +214,10 @@ input { -webkit-user-select: text; user-select: text; }
 #sharedAll { margin-top: 14px; text-align: center; }
 .vimg img { display: block; width: auto; max-width: 100%; max-height: 54dvh; margin: 0 auto; }
 .top { position: relative; background: transparent; }
+
+.lpx { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.lpx > span { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: .78rem; border-radius: 6px; padding: 1px 3px; }
+.lpx .lg { background: var(--card); }
+.lpx .price { font-size: .8rem; color: var(--muted); margin: 0; }
+.lpx .cur { background: rgba(255, 107, 139, .18); }
+.lpx .cur .price { color: var(--accent); font-weight: 800; }

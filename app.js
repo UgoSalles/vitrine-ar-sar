@@ -384,16 +384,19 @@ function renderList(kind) {
   const rows = [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([dex, list]) => [dex, list.sort(order)]);
   $(kind === 'wish' ? '#wishList' : '#colList').innerHTML = rows.length ? rows.map(([dex, list]) => `
     <div class="col-group"><h3>#${pad(dex)} ${esc(dexName(dex))} <span>${plural(list.length, 'carte')}</span></h3>
-      <div class="col-cards">${list.map(({ e, lang }) => `<button class="ccard" data-view="${esc(vkey(lang, e.v[lang].id))}"><div class="img"><img ${imgAttrs(e, lang)} alt="${esc(e.n)}" loading="lazy"><i class="lg badge-lg">${LCODE[lang]}</i></div><span class="pl">${priceHTML(pkey(e, lang))}</span></button>`).join('')}</div>
+      <div class="col-cards">${list.map(({ e, lang }) => `<button class="ccard" data-view="${esc(vkey(lang, e.v[lang].id))}"><div class="img"><img ${imgAttrs(e, lang)} alt="${esc(e.n)}" loading="lazy"><i class="lg badge-lg">${LCODE[lang]}</i></div>${kind === 'wish' ? langPrices(e, lang) : `<span class="pl">${priceHTML(pkey(e, lang))}</span>`}</button>`).join('')}</div>
     </div>`).join('')
     : kind === 'wish'
       ? `<div class="empty">Ta wish list est vide.<br>Dans « Toutes les cartes », ouvre un Pokémon et touche ♥ sous la carte que tu cherches.</div>`
       : `<div class="empty">Ta collection est vide.<br>Va dans « Toutes les cartes », choisis un Pokémon et coche tes cartes.</div>`;
   collectionOrder[kind] = rows.flatMap(([, l]) => l.map(x => ({ k: x.e.k, lang: x.lang })));
-  watchPrices([...src].filter(k => byVer.has(k)).map(k => { const e = byVer.get(k), l = k.slice(0, k.indexOf(':')); return pkey(e, l); }));
+  watchPrices(kind === 'wish' ? [...src].filter(k => byVer.has(k)).flatMap(k => allPks(byVer.get(k)))
+    : [...src].filter(k => byVer.has(k)).map(k => { const e = byVer.get(k), l = k.slice(0, k.indexOf(':')); return pkey(e, l); }));
   paintTotal();
 }
 const collectionOrder = { col: [], wish: [] };
+// Wish list : le prix de chaque langue disponible, la langue recherchée en surbrillance
+const langPrices = (e, lang) => `<span class="lpx">${langsOf(e).map(l => { const p = prices[pkey(e, l)]?.tr; return `<span class="${l === lang ? 'cur' : ''}"><i class="lg">${LCODE[l]}</i><span class="price${p != null ? '' : ' na'}" data-pk="${pkey(e, l)}">${p != null ? eur(p) : '…'}</span></span>`; }).join('')}</span>`;
 const renderCollection = () => renderList('col');
 const renderWish = () => renderList('wish');
 
