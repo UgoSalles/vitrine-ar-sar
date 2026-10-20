@@ -21,3 +21,8 @@ Dossier 100 % statique, aucun build : Netlify (glisser-déposer le dossier), Clo
 Ensuite : ouvrir le lien sur le téléphone → *Partager → Sur l'écran d'accueil* (iPhone) / *Installer l'appli* (Android).
 
 `node scripts/make-icons.mjs` régénère les icônes.
+
+## Langues, prix et suivi (v2)
+- **Langues** : FR, JP, EN (ordre de préférence). Une carte = une illustration ; elle peut exister dans plusieurs langues. Ce qu'on coche = une version précise (ex. « 151 Bulbizarre, japonaise »). Dans la collection, la carte s'affiche dans sa langue avec le prix de cette langue. FR et EN partagent la même fiche Cardmarket (même prix) ; le JP a la sienne. Les cartes japonaises sont rapprochées des françaises par (Pokémon, illustrateur, type) + proximité de date (`data/ja-meta.json` = base japonaise embarquée, complétée en ligne).
+- **Tendance** : variation 7 j / 30 j (Cardmarket) sous chaque prix, valeur de la collection et variation sur 7 jours.
+- **Stats** (collection → 📊), **vue par extension**, filtres par type, tri par prix, glisser pour passer d'une carte à l'autre, rappel de sauvegarde, partage de la wish list par lien.

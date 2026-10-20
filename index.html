@@ -21,19 +21,42 @@
       <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
     </div>
     <div class="tools" id="dexTools">
+      <div class="chips">
+        <button class="chip on" data-mode="dex">Par Pokémon</button>
+        <button class="chip" data-mode="set">Par extension</button>
+      </div>
       <input id="search" type="search" placeholder="Nom ou numéro…" autocomplete="off" enterkeyhint="search">
       <div class="chips" id="filters">
         <button class="chip on" data-f="all">Tous</button>
         <button class="chip" data-f="cards">Avec cartes</button>
         <button class="chip" data-f="missing">À compléter</button>
       </div>
+      <div class="chips" id="typeChips">
+        <button class="chip sm on" data-type="">Tous types</button>
+        <button class="chip sm" data-type="AR">AR</button>
+        <button class="chip sm" data-type="SAR">SAR</button>
+        <button class="chip sm" data-type="ALT">ALT</button>
+        <button class="chip sm" data-type="GAL">GAL</button>
+        <button class="chip sm" data-type="PRM">PRM</button>
+        <button class="chip sm" data-type="SCN">SCÈNE</button>
+      </div>
     </div>
-    <div class="summary" id="colSummary" hidden></div>
+    <div class="summary" id="summary" hidden>
+      <div id="sumInfo" class="sum-info"></div>
+      <button class="mini-btn" id="statsBtn" hidden>📊 Stats</button>
+      <button class="mini-btn" id="shareBtn" hidden>Partager</button>
+    </div>
+    <div class="backup" id="backupBar" hidden>
+      <span>💾 Pense à sauvegarder ta collection.</span>
+      <button class="mini-btn" id="backupNow">Exporter</button>
+      <button class="mini-btn ghost" id="backupLater">Plus tard</button>
+    </div>
   </header>
 
   <main>
     <section id="viewDex" class="view">
       <div id="dexGrid" class="dex-grid"></div>
+      <div id="setList" class="set-list" hidden></div>
     </section>
     <section id="viewCol" class="view" hidden>
       <div id="colList"></div>
@@ -50,7 +73,7 @@
     <button class="tab" data-tab="wish"><span class="ti">♥</span>Wish list <b id="wishCount">0</b></button>
   </nav>
 
-  <!-- Feuille d'un Pokémon -->
+  <!-- Feuille d'un Pokémon ou d'une extension -->
   <div id="sheet" class="sheet" hidden>
     <div class="sheet-bg" data-close></div>
     <div class="sheet-body" role="dialog" aria-modal="true">
@@ -63,6 +86,8 @@
         </div>
         <button class="icon-btn" data-close aria-label="Fermer">✕</button>
       </div>
+      <div class="sortbar"><label for="shSort" class="muted">Trier :</label>
+        <select id="shSort"><option value="default">Par date / numéro</option><option value="desc">Prix décroissant</option><option value="asc">Prix croissant</option></select></div>
       <div id="shCards" class="sheet-cards"></div>
       <button class="btn ghost block" id="addCardBtn">＋ Il manque une carte ? La chercher parmi toutes les cartes de ce Pokémon</button>
     </div>
@@ -81,17 +106,49 @@
     </div>
   </div>
 
+  <!-- Choix de la langue -->
+  <div id="langPick" class="sheet" hidden>
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-body small" role="dialog" aria-modal="true">
+      <h2 id="lpTitle"></h2><div class="muted" id="lpSub"></div>
+      <div id="lpRows" class="vlangs"></div>
+      <button class="btn ghost block" data-close>Terminé</button>
+    </div>
+  </div>
+
   <!-- Visionneuse de carte -->
   <div id="viewer" class="viewer" hidden>
     <div class="sheet-bg" data-close></div>
     <div class="viewer-body">
-      <img id="vImg" alt="">
-      <div id="vInfo" class="viewer-info"></div>
-      <div class="viewer-actions col">
-        <button class="btn" id="vToggle"></button>
-        <button class="btn wish" id="vWish"></button>
-        <button class="btn ghost" data-close>Fermer</button>
+      <div class="vimg">
+        <button class="nav prev" id="vPrev" aria-label="Précédente">‹</button>
+        <img id="vImg" alt="">
+        <button class="nav next" id="vNext" aria-label="Suivante">›</button>
       </div>
+      <div class="muted tiny" id="vPos"></div>
+      <div id="vInfo" class="viewer-info"></div>
+      <div id="vLangs" class="vlangs"></div>
+      <div id="vPrice" class="viewer-info"></div>
+      <div class="viewer-actions col"><button class="btn ghost" data-close>Fermer</button></div>
+    </div>
+  </div>
+
+  <!-- Statistiques -->
+  <div id="stats" class="sheet" hidden>
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-body" role="dialog" aria-modal="true">
+      <div class="sheet-head"><div class="sheet-title"><h2>Statistiques</h2></div><button class="icon-btn" data-close aria-label="Fermer">✕</button></div>
+      <div id="stBody"></div>
+    </div>
+  </div>
+
+  <!-- Wish list reçue d'un proche -->
+  <div id="shared" class="sheet" hidden>
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-body" role="dialog" aria-modal="true">
+      <div class="sheet-head"><div class="sheet-title"><h2>Wish list partagée</h2><div class="muted">Les cartes qu’on t’a envoyées.</div></div><button class="icon-btn" data-close aria-label="Fermer">✕</button></div>
+      <div id="shBody"></div>
+      <button class="btn block" id="sharedAll">♥ Tout ajouter à ma wish list</button>
     </div>
   </div>
 
@@ -101,11 +158,12 @@
     <div class="sheet-body small">
       <h2>Options</h2>
       <button class="btn block" id="refreshBtn">↻ Actualiser le catalogue et les prix</button>
-      <button class="btn block" id="exportBtn">⬆ Exporter ma collection</button>
+      <button class="btn block" id="exportBtn">⬆ Exporter ma collection (sauvegarde)</button>
       <button class="btn block" id="importBtn">⬇ Importer une collection</button>
       <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <p class="muted small-print" id="lastBackup"></p>
       <p class="muted small-print" id="menuInfo"></p>
-      <p class="muted small-print">Données : TCGdex (cartes en français, prix Cardmarket). Illustrations : PokéAPI.</p>
+      <p class="muted small-print">Données : TCGdex (cartes en français, japonais, anglais ; prix Cardmarket). Illustrations : PokéAPI. Français et anglais partagent la même cote Cardmarket ; le japonais a la sienne.</p>
       <button class="btn ghost block" data-close>Fermer</button>
     </div>
   </div>
