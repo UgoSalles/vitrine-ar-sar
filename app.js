@@ -649,11 +649,24 @@ let sharedKeys = [];
 
 // ---------- Fenêtres (avec bouton retour du téléphone) ----------
 const stack = [];
-function showModal(sel, replace) { $(sel).hidden = false; stack.push(sel); replace ? history.replaceState({ m: sel }, '') : history.pushState({ m: sel }, ''); }
+function showModal(sel, replace) { lockScroll(); $(sel).hidden = false; stack.push(sel); replace ? history.replaceState({ m: sel }, '') : history.pushState({ m: sel }, ''); }
+// Quand une fenêtre est ouverte, la page en arrière-plan ne doit pas défiler (sur iPhone, `overflow: hidden` ne suffit pas : on fige le body et on retient la position).
+let lockY = null;
+function lockScroll() {
+  if (lockY !== null) return;
+  lockY = window.scrollY;
+  Object.assign(document.body.style, { position: 'fixed', top: `-${lockY}px`, left: '0', right: '0', width: '100%' });
+}
+function unlockScroll() {
+  if (lockY === null) return;
+  Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '' });
+  window.scrollTo(0, lockY); lockY = null;
+}
 let skipPop = 0;                                    // retours d'historique déclenchés par nous (ne doivent pas fermer une 2ᵉ fenêtre)
 function hideTop(fromPop) {
   const sel = stack.pop(); if (!sel) return;
   $(sel).hidden = true;
+  if (!stack.length) unlockScroll();
   if (!fromPop) { skipPop++; history.back(); }
 }
 window.addEventListener('popstate', () => {
