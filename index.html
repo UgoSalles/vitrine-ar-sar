@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vitrine AR/SAR</title>
+  <meta name="theme-color" content="#0f1222">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vitrine AR/SAR">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="top-row">
+      <h1 id="title">Tous les Pokémon</h1>
+      <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
+    </div>
+    <div class="tools" id="dexTools">
+      <input id="search" type="search" placeholder="Nom ou numéro…" autocomplete="off" enterkeyhint="search">
+      <div class="chips" id="filters">
+        <button class="chip on" data-f="all">Tous</button>
+        <button class="chip" data-f="cards">Avec cartes</button>
+        <button class="chip" data-f="missing">À compléter</button>
+      </div>
+    </div>
+    <div class="summary" id="colSummary" hidden></div>
+  </header>
+
+  <main>
+    <section id="viewDex" class="view">
+      <div id="dexGrid" class="dex-grid"></div>
+    </section>
+    <section id="viewCol" class="view" hidden>
+      <div id="colList"></div>
+    </section>
+    <div id="loading" class="loading">Chargement du catalogue…</div>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab on" data-tab="dex"><span class="ti">📖</span>Toutes les cartes</button>
+    <button class="tab" data-tab="col"><span class="ti">⭐</span>Ma collection <b id="colCount">0</b></button>
+  </nav>
+
+  <!-- Feuille d'un Pokémon -->
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-body" role="dialog" aria-modal="true">
+      <div class="sheet-head">
+        <img id="shArt" alt="">
+        <div class="sheet-title">
+          <div id="shNum" class="muted"></div>
+          <h2 id="shName"></h2>
+          <div id="shInfo" class="muted"></div>
+        </div>
+        <button class="icon-btn" data-close aria-label="Fermer">✕</button>
+      </div>
+      <div id="shCards" class="sheet-cards"></div>
+      <button class="btn ghost block" id="addCardBtn">＋ Il manque une carte ? La chercher parmi toutes les cartes de ce Pokémon</button>
+    </div>
+  </div>
+
+  <!-- Choisir une carte à ajouter à la liste -->
+  <div id="picker" class="sheet" hidden>
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-body" role="dialog" aria-modal="true">
+      <div class="sheet-head">
+        <div class="sheet-title"><h2 id="pkTitle">Ajouter une carte</h2><div class="muted">Toutes les cartes connues de ce Pokémon (promos, autres éditions…). Celle que tu choisis rejoint sa liste et reste sur ton téléphone.</div></div>
+        <button class="icon-btn" data-close aria-label="Fermer">✕</button>
+      </div>
+      <input id="pkSearch" type="search" placeholder="Filtrer : extension, numéro…" autocomplete="off">
+      <div id="pkList" class="pk-list"></div>
+    </div>
+  </div>
+
+  <!-- Visionneuse de carte -->
+  <div id="viewer" class="viewer" hidden>
+    <div class="sheet-bg" data-close></div>
+    <div class="viewer-body">
+      <img id="vImg" alt="">
+      <div id="vInfo" class="viewer-info"></div>
+      <div class="viewer-actions">
+        <button class="btn" id="vToggle"></button>
+        <button class="btn ghost" data-close>Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu -->
+  <div id="menu" class="sheet" hidden>
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-body small">
+      <h2>Options</h2>
+      <button class="btn block" id="refreshBtn">↻ Actualiser le catalogue et les prix</button>
+      <button class="btn block" id="exportBtn">⬆ Exporter ma collection</button>
+      <button class="btn block" id="importBtn">⬇ Importer une collection</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <p class="muted small-print" id="menuInfo"></p>
+      <p class="muted small-print">Données : TCGdex (cartes en français, prix Cardmarket). Illustrations : PokéAPI.</p>
+      <button class="btn ghost block" data-close>Fermer</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
